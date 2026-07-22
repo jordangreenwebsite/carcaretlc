@@ -2,14 +2,121 @@
 
 const searchResults = [];
 
+function sspEscapeHTML(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(character) {
+        return {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        }[character];
+    });
+}
+
+function sspBuildConfigUrl(configPath, fileName, versionSuffix) {
+    let basePath = String(configPath || '/wp-content/uploads/simply-static/configs/').trim();
+
+    basePath = basePath.replace(/^(https?)\/\//i, '$1://');
+
+    if (!basePath.endsWith('/')) {
+        basePath += '/';
+    }
+
+    try {
+        return new URL(fileName + versionSuffix, new URL(basePath, window.location.origin + '/')).toString();
+    } catch (_) {
+        if (/^https?:\/\//i.test(basePath)) {
+            return basePath + fileName + versionSuffix;
+        }
+
+        return window.location.origin + (basePath.charAt(0) === '/' ? '' : '/') + basePath + fileName + versionSuffix;
+    }
+}
+
+function sspGetExportBaseFromConfig(configPath) {
+    try {
+        const marker = '/wp-content/';
+        const path = new URL(configPath || '/', window.location.origin + '/').pathname;
+        const markerIndex = path.indexOf(marker);
+        let basePath = markerIndex === -1 ? '/' : path.substring(0, markerIndex + 1);
+
+        if (!basePath.startsWith('/')) {
+            basePath = '/' + basePath;
+        }
+
+        if (!basePath.endsWith('/')) {
+            basePath += '/';
+        }
+
+        return basePath;
+    } catch (_) {
+        return '/';
+    }
+}
+
+function sspBuildPublicUrl(path, exportBase) {
+    const value = String(path || '');
+
+    if (/^https?:\/\//i.test(value)) {
+        return value;
+    }
+
+    if (exportBase && exportBase !== '/' && value.indexOf(exportBase) === 0) {
+        return new URL(value.replace(/^\/+/, ''), window.location.origin + '/').toString();
+    }
+
+    const relativePath = value.replace(/^\/+/, '');
+    return new URL(relativePath, window.location.origin + exportBase).toString();
+}
+
+function sspSafeResultUrl(path, exportBase) {
+    try {
+        const value = String(path || '').trim();
+        if ('' === value || '#' === value) {
+            return '#';
+        }
+        if (/^[a-z][a-z0-9+.-]*:/i.test(value) && !/^https?:/i.test(value)) {
+            return '#';
+        }
+
+        const candidate = /^https?:\/\//i.test(value) || /^\/\//.test(value)
+            ? value
+            : sspBuildPublicUrl(value, exportBase);
+        const url = new URL(candidate, window.location.origin + '/');
+
+        if (!/^https?:$/.test(url.protocol) || url.origin !== window.location.origin || url.username || url.password) {
+            return '#';
+        }
+
+        return url.toString();
+    } catch (_) {
+        return '#';
+    }
+}
+
 // Helper: render excerpt conditionally based on localized flag and presence
 function renderExcerpt(item) {
     try {
         if (window.ssp_search && ssp_search.show_excerpt && item && item.excerpt) {
-            return `<small>${item.excerpt}</small>`;
+            return `<small>${sspEscapeHTML(item.excerpt)}</small>`;
         }
     } catch (_) {}
     return '';
+}
+
+function sspRenderResultItem(result, index, selected, exportBase) {
+    const item = result && result.item ? result.item : {};
+    const href = sspEscapeHTML(sspSafeResultUrl(item.url, exportBase));
+
+    return `
+                  <a href="${href}">
+                    <li class='auto-complete-item${index === selected ? ' selected' : ''}'>
+                      ${sspEscapeHTML(item.title)}</br>
+                        ${renderExcerpt(item)}
+                    </li>
+                  </a>
+                `;
 }
 
 /**
@@ -34,8 +141,9 @@ function initFuseSearch() {
             version_suffix = '?ver=' + encodeURIComponent(v);
         }
     }
-    let index_url = window.location.origin + config_path + 'fuse-index.json' + version_suffix;
-    let config_url = window.location.origin + config_path + 'fuse-config.json' + version_suffix;
+    let index_url = sspBuildConfigUrl(config_path, 'fuse-index.json', version_suffix);
+    let config_url = sspBuildConfigUrl(config_path, 'fuse-config.json', version_suffix);
+    let export_base = sspGetExportBaseFromConfig(config_path);
     let index;
     let config;
 
@@ -108,13 +216,15 @@ function initFuseSearch() {
 
         // Build search index for Fuse.
         for (const value of index) {
-            var result = {
-                url: window.location.origin + value.path,
+            // Preserve custom fields added via ssp_search_index_item so weighted
+            // Fuse keys from ssp_fuse_search_weights can search against them.
+            var result = Object.assign({}, value, {
+                url: sspSafeResultUrl(value.path, export_base),
                 title: value.title,
                 excerpt: value.excerpt,
                 content: value.content,
                 language: value.language
-            };
+            });
 
             if (is_multilingual) {
                 // Include entry if:
@@ -143,20 +253,53 @@ function initFuseSearch() {
 
 // Search.
 
-    let keys = ['title', 'content', 'excerpt', 'language'];
     let fuse = null;
+
+    // Default max results; updated once config loads
+    let maxResults = 7;
 
     loadConfig(function (response) {
         config = JSON.parse(response);
 
+        // Read configurable max results (fallback to 7)
+        if (config.maxResults && parseInt(config.maxResults, 10) > 0) {
+            maxResults = parseInt(config.maxResults, 10);
+        }
+
+        // Build weighted keys dynamically from config (supports custom fields added via ssp_fuse_search_weights filter)
+        var weights = config.weights || {};
+        var keys = [];
+        for (var field in weights) {
+            if (weights.hasOwnProperty(field)) {
+                keys.push({ name: field, weight: parseFloat(weights[field]) || 1 });
+            }
+        }
+        // Ensure default keys exist if not provided
+        if (!weights.title) keys.push({ name: 'title', weight: 1 });
+        if (!weights.content) keys.push({ name: 'content', weight: 1 });
+        if (!weights.excerpt) keys.push({ name: 'excerpt', weight: 1 });
+        keys.push({ name: 'language', weight: 1 });
+
+        var fuseOptions = {
+            keys: keys,
+            shouldSort: true,
+            threshold: config.threshold ? config.threshold : 0.1,
+            maxPatternLength: 50
+        };
+
+        // Add extended search if enabled
+        if (config.useExtendedSearch) {
+            fuseOptions.useExtendedSearch = true;
+        }
+
+        // Add ignore location if enabled
+        if (config.ignoreLocation) {
+            fuseOptions.ignoreLocation = true;
+        }
+
         fuse = new Fuse(
             searchResults,
-            {
-                keys: keys,
-                shouldSort: true,
-                threshold: config.threshold ? config.threshold : 0.1,
-                maxPatternLength: 50
-            }
+            fuseOptions
         );
 
         configLoaded = true;
@@ -205,7 +348,8 @@ function initFuseSearch() {
             if (input.length >= 1 && window.ssp_search && ssp_search.use_static_results_page && ssp_search.static_search_path) {
                 // Check if we're already on the static search page to avoid redirect loop
                 var staticPath = ssp_search.static_search_path;
-                var basePath = staticPath.replace(/index\.html$/, '');
+                var staticUrl = new URL(String(staticPath || '').replace(/^\/+/, ''), window.location.origin + export_base);
+                var basePath = staticUrl.pathname.replace(/index\.html$/, '');
                 if (basePath.charAt(basePath.length - 1) !== '/') {
                     basePath += '/';
                 }
@@ -217,7 +361,7 @@ function initFuseSearch() {
                 // Only redirect if we're NOT already on the search page
                 var isOnSearchPage = currentPath === basePath || currentPath === staticPath || currentPath.endsWith('/__qs/') || currentPath.endsWith('/__qs/index.html');
                 if (!isOnSearchPage) {
-                    var searchUrl = window.location.origin + basePath + '?s=' + encodeURIComponent(input);
+                    var searchUrl = staticUrl.origin + basePath + '?s=' + encodeURIComponent(input);
                     window.location.href = searchUrl;
                     return;
                 }
@@ -226,7 +370,7 @@ function initFuseSearch() {
 
             // Always compute results on submit so the results list can render
             if (input.length >= 3 && fuse) {
-                results = fuse.search(input).slice(0, 7)
+                results = fuse.search(input).slice(0, maxResults)
             }
 
             // Ensure autocomplete dropdown is (re)shown on submit
@@ -237,21 +381,14 @@ function initFuseSearch() {
             if (input.length > 2) {
                 if (results.length) {
                     resultNode.innerHTML = `
-                <div class="ssp-results"><h5>Searched for: <b>${input}</b></h5>
+                <div class="ssp-results"><h5>Searched for: <b>${sspEscapeHTML(input)}</b></h5>
                 <ul>
-                  ${results.map((result, index) => `
-                  <a href="${result.item.url}">
-                    <li class='auto-complete-item${index === selected ? ' selected' : ''}'>
-                      ${result.item.title}</br>
-                        ${renderExcerpt(result.item)}
-                    </li>
-                  </a>
-                `).join('')}
+                  ${results.map((result, index) => sspRenderResultItem(result, index, selected, export_base)).join('')}
                 </ul></div>`
                 } else {
                     resultNode.innerHTML = `
             <div class="ssp-results">
-            <h5>Searched for: <b>${input}</b></h5>
+            <h5>Searched for: <b>${sspEscapeHTML(input)}</b></h5>
             <ul>
             <li>We couldn't find any matching results.</li>
             </ul>
@@ -271,14 +408,7 @@ function initFuseSearch() {
             }
             return `
                 <ul>
-                  ${results.map((result, index) => `
-                  <a href="${result.item.url}">
-                    <li class='auto-complete-item${index === selected ? ' selected' : ''}'>
-                      ${result.item.title}</br>
-                        ${renderExcerpt(result.item)}
-                    </li>
-                  </a>
-                `).join('')}
+                  ${results.map((result, index) => sspRenderResultItem(result, index, selected, export_base)).join('')}
                 </ul>
               `
         }
@@ -291,7 +421,7 @@ function initFuseSearch() {
 
             if (input.length >= 3) {
                 if (fuse) {
-                    results = fuse.search(input).slice(0, 7)
+                    results = fuse.search(input).slice(0, maxResults)
                 } else {
                     // Fuse not ready yet; wait for it to load
                     results = []

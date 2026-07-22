@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!buttonEl.dataset.sspOriginalHtml) {
             buttonEl.dataset.sspOriginalHtml = buttonEl.innerHTML;
         }
-        buttonEl.textContent = 'Exporting…';
+        buttonEl.textContent = 'Pushing…';
 
         var body = new URLSearchParams();
         body.set('action', 'apply_single');
@@ -191,7 +191,12 @@ document.addEventListener('DOMContentLoaded', function() {
             body: body.toString()
         })
             .then(function(res){ return res.json(); })
-            .then(function(){ restoreButton(buttonEl); })
+            .then(function(response){
+                if (response && response.success === false && response.data && response.data.message) {
+                    window.alert(response.data.message);
+                }
+                restoreButton(buttonEl);
+            })
             .catch(function(){ restoreButton(buttonEl); });
     }
 
@@ -203,7 +208,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Inject Export button into Gutenberg header next to Publish/Update.
+    // Inject Push button into Gutenberg header next to Publish/Update.
     function injectGutenbergButton() {
         var candidates = [
             '.edit-post-header__settings',
@@ -223,31 +228,16 @@ document.addEventListener('DOMContentLoaded', function() {
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'components-button is-primary ssp-export-button';
-        btn.textContent = 'Export';
+        btn.textContent = 'Push';
         btn.addEventListener('click', function(){ sspStartSingleExport(btn); });
         container.insertBefore(btn, container.firstChild);
         return true;
     }
 
-    // Inject Export button into Classic Editor near Publish/Update.
+    // Inject Push button into Classic Editor near Publish/Update.
     function injectClassicButton() {
-        var actions = qs('#major-publishing-actions');
-        if (!actions) return false;
-        // Skip for ssp-form post type
-        try { if (sspGetCurrentPostType() === 'ssp-form') return false; } catch(e) {}
-        if (qs('.ssp-export-button', actions)) return true;
-        var publish = qs('#publish', actions);
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'button ssp-export-button';
-        btn.style.marginLeft = '8px';
-        btn.textContent = 'Export';
-        btn.addEventListener('click', function(){ sspStartSingleExport(btn); });
-        if (publish) {
-            publish.insertAdjacentElement('afterend', btn);
-        } else {
-            actions.appendChild(btn);
-        }
+        // Classic Editor button is now injected via PHP (post_submitbox_misc_actions hook)
+        // for better reliability across different WP versions and configurations.
         return true;
     }
 
@@ -300,8 +290,8 @@ document.addEventListener('DOMContentLoaded', function() {
             var btn = topDocument.createElement('button');
             btn.type = 'button';
             btn.className = 'ssp-floating-export';
-            btn.setAttribute('aria-label', 'Simply Static Export');
-            btn.textContent = 'Export';
+            btn.setAttribute('aria-label', 'Simply Static Push');
+            btn.textContent = 'Push';
             btn.addEventListener('click', function(){ sspStartSingleExport(btn); });
             return btn;
         }

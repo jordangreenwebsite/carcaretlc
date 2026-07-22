@@ -13,6 +13,30 @@ function sspGetQueryParam(name) {
   } catch (_) { return ''; }
 }
 
+function sspSafeNavigationUrl(value) {
+  try {
+    const url = new URL(String(value || ''), window.location.origin + '/');
+    if (!/^https?:$/.test(url.protocol) || url.username || url.password) return null;
+
+    const trustedOrigins = [window.location.origin];
+    if (window.ssp_search && Array.isArray(ssp_search.trusted_navigation_origins)) {
+      ssp_search.trusted_navigation_origins.forEach(function(origin) {
+        try {
+          const trusted = new URL(String(origin));
+          if (/^https?:$/.test(trusted.protocol) && !trusted.username && !trusted.password) {
+            trustedOrigins.push(trusted.origin);
+          }
+        } catch (_) {}
+      });
+    }
+
+    if (trustedOrigins.indexOf(url.origin) === -1) return null;
+    return url.toString();
+  } catch (_) {
+    return null;
+  }
+}
+
 // Derive the static export base path (e.g., '/static/') from the ssp-config-path meta tag only.
 // Falls back to '/'. Always returns a leading and trailing slash.
 function sspGetExportBase() {
@@ -115,9 +139,14 @@ function sspAddHideNativeStyles() {
       'main .search-results',
       'main .posts',
       'main .wp-block-query',
+      'main > article',
+      'main > .hentry',
       '#primary .search-results',
+      '#primary > article',
       '.site-main .search-results',
+      '.site-main > article',
       '.content-area .search-results',
+      '.content-area > article',
       '.wp-block-post-content .search-results'
     ].join(',\n') + ' { display: none !important; }';
     document.head.appendChild(style);
@@ -130,7 +159,10 @@ function sspEnsureHeadingPlaceholder(beforeEl) {
     if (document.getElementById('ssp-term')) return;
     const h = document.createElement('h1');
     h.className = 'ssp-search-heading';
-    h.innerHTML = 'Searched for: <span id="ssp-term"></span>';
+    h.appendChild(document.createTextNode('Searched for: '));
+    const term = document.createElement('span');
+    term.id = 'ssp-term';
+    h.appendChild(term);
     if (beforeEl && beforeEl.parentNode) {
       beforeEl.parentNode.insertBefore(h, beforeEl);
     } else {
@@ -159,6 +191,11 @@ function sspInjectIntoSearchPage() {
           if (inputEl) {
             inputEl.value = term;
             inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+            // Also trigger submit so full results render (not just autocomplete)
+            var parentForm = inputEl.closest ? inputEl.closest('.search-form') : null;
+            if (parentForm) {
+              parentForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            }
           }
         });
       }
@@ -175,13 +212,16 @@ function sspInjectIntoSearchPage() {
     return null;
   }
 
+  // On the static search results page, prefer the main content container over custom_selector
+  // so the Fuse UI replaces native results in <main>, not in a sidebar/footer widget form.
   let candidates = [];
-  if (window.ssp_search && ssp_search.custom_selector) candidates.push(ssp_search.custom_selector);
   if (window.ssp_search && Array.isArray(ssp_search.selectors)) candidates = candidates.concat(ssp_search.selectors);
 
   // Choose a safe content target; avoid falling back to <body> to prevent inserting above header/nav
   let target = firstMatch(candidates);
   if (!target) target = document.querySelector('main') || document.getElementById('primary');
+  // Only fall back to custom_selector if no content container was found
+  if (!target && window.ssp_search && ssp_search.custom_selector) target = firstMatch([ssp_search.custom_selector]);
   if (!target) return; // No safe target found; abort to avoid layout shifts
 
   const wrapper = document.createElement('div');
@@ -195,7 +235,7 @@ function sspInjectIntoSearchPage() {
 
   const mode = (window.ssp_search && ssp_search.inject_mode) ? ssp_search.inject_mode : 'replace';
   if (mode === 'replace') {
-    const hideSelectors = ['.search-results','.hfeed','.posts','.wp-block-query'];
+    const hideSelectors = ['.search-results','.hfeed','.posts','.wp-block-query','article.entry','article.hentry','article.post'];
     hideSelectors.forEach(function (sel) {
       try { const nodes = target.querySelectorAll(sel); nodes.forEach((n) => n.style.display = 'none'); } catch(_) {}
     });
@@ -233,11 +273,17 @@ function sspInjectIntoSearchPage() {
     }
   } catch(_) {}
 
-  // Initialize Fuse form behaviors from ssp-search.js on the actual page form node
+  // Initialize search form behaviors on the actual page form node
+  // Use AlgoliaSearchForm when search_type is 'algolia', otherwise use FuseSearchForm
   try {
     const pageFormNode = wrapper.querySelector('.ssp-search');
     if (pageFormNode) {
-      new FuseSearchForm(pageFormNode);
+      const searchType = (window.ssp_search && ssp_search.search_type) ? ssp_search.search_type : 'fuse';
+      if (searchType === 'algolia' && typeof window.AlgoliaSearchForm === 'function') {
+        new AlgoliaSearchForm(pageFormNode);
+      } else if (typeof FuseSearchForm === 'function') {
+        new FuseSearchForm(pageFormNode);
+      }
     }
   } catch(_) {}
 
@@ -341,6 +387,7 @@ function sspMaybeRedirectForSearch() {
       }
     }
 
+    target = sspSafeNavigationUrl(target);
     if (target && target !== window.location.href) {
       window.location.replace(target);
     }
@@ -444,8 +491,8 @@ function sspInitSearchPageIfNeeded() {
           }, delay);
         });
 
-        // Also, after Fuse signals ready, trigger input again to ensure suggestions populate everywhere
-        // Helper function to re-trigger inputs
+        // Also, after Fuse signals ready, trigger input AND submit to ensure both
+        // autocomplete suggestions and full results render on the search page.
         function retriggerInputs() {
           var inputs = document.querySelectorAll('.ssp-search .search-input');
           inputs.forEach(function(inp){
@@ -456,6 +503,11 @@ function sspInitSearchPageIfNeeded() {
               }
               if ((inp.value || '').trim().length >= 3) {
                 inp.dispatchEvent(new Event('input', { bubbles: true }));
+                // Also trigger submit so handleSearchSubmit renders full results
+                var parentForm = inp.closest ? inp.closest('.search-form') : null;
+                if (parentForm) {
+                  parentForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                }
               }
             } catch(_) {}
           });
@@ -526,5 +578,9 @@ function sspAttachSubmitRedirect(scopeEl) {
   window.addEventListener('ssp:fuse-ready', function(){
     try { sspInitSearchPageIfNeeded(); } catch(_) {}
     try { sspAttachSubmitRedirect(); } catch(_) {}
+  });
+  // After the index data is loaded, re-trigger so results render with the full collection
+  window.addEventListener('ssp:index-ready', function(){
+    try { sspInitSearchPageIfNeeded(); } catch(_) {}
   });
 })();
