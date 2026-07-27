@@ -142,7 +142,7 @@ function cmplzLoadConsentAreaContent(consentedCategory, consentedService){
         let blockId = obj.getAttribute('data-block_id');
         if ( consentedCategory === category || consentedService === service ) {
             let consent_area_name = 'complianz-consent-area-' + postId + '-' + blockId + '.html';
-            let consent_url = config_url + consent_area_name;
+            let consent_url = sspBuildConfigUrl(config_path, consent_area_name, version_suffix);
             //if not stored yet, load. As features in the user object can be changed on updates, we also check for the version
             let request = new XMLHttpRequest();
             request.open('GET', consent_url, true);
@@ -1506,10 +1506,7 @@ if ( complianz.geoip == 1 && (cmplz_user_data.length == 0 || (cmplz_user_data.ve
     let request = new XMLHttpRequest();
     let cmplzUserRegion = cmplz_get_url_parameter(window.location.href, 'cmplz_user_region');
     cmplzUserRegion = cmplzUserRegion ? '&cmplz_user_region=' + cmplzUserRegion : '';
-    let banner_url = config_url + 'complianz-banner.json';
-    if (version_suffix) {
-        banner_url += version_suffix;
-    }
+    let banner_url = sspBuildConfigUrl(config_path, 'complianz-banner.json', version_suffix);
     let delimiter = banner_url.indexOf('?') !== -1 ? '&' : '?';
     request.open('GET', banner_url + delimiter + complianz.locale + cmplzUserRegion, true);
     request.setRequestHeader('Content-type', 'application/json');
@@ -2215,9 +2212,10 @@ function cmplz_load_manage_consent_container() {
             consent_area_name = 'complianz-do-not-track.html';
         }
 
-        let html_consent_url = config_url + consent_area_name;
+        let html_consent_url = sspBuildConfigUrl(config_path, consent_area_name, version_suffix);
+        let delimiter = html_consent_url.indexOf('?') !== -1 ? '&' : '?';
 
-        request.open('GET', html_consent_url+'?'+complianz.locale, true);
+        request.open('GET', html_consent_url + delimiter + complianz.locale, true);
         request.setRequestHeader('Content-type', 'application/json');
         request.send();
         request.onload = function() {
