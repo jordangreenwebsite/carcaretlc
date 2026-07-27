@@ -81,6 +81,29 @@ if (!window.__sspTurnstileReady) {
         return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2);
     }
 
+    function sspSubmissionId() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+            return window.crypto.randomUUID();
+        }
+
+        var bytes = new Uint8Array(16);
+        if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+            window.crypto.getRandomValues(bytes);
+        } else {
+            for (var i = 0; i < bytes.length; i++) {
+                bytes[i] = Math.floor(Math.random() * 256);
+            }
+        }
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+        var hex = Array.prototype.map.call(bytes, function (value) {
+            return value.toString(16).padStart(2, '0');
+        }).join('');
+        return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' +
+            hex.slice(16, 20) + '-' + hex.slice(20);
+    }
+
     function isSimplyStaticEntriesEndpoint(url) {
         return /\/wp-json\/simplystatic\/v1\/entries\/?$/i.test(String(url || '').split('?')[0]);
     }
@@ -837,6 +860,9 @@ if (!window.__sspTurnstileReady) {
         return fetch(url, requestData).then(response => {
             const isRedirectLike = response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400);
             const success = response.ok || isRedirectLike;
+            if (success && formEl && settings && settings.form_delivery_transport === 'studio_queue') {
+                formEl.__sspQueueSubmissionId = null;
+            }
             handleMessage(settings, !success, formEl);
             return { success: success, settings: settings, form: formEl, response: response };
         }).catch(error => {
@@ -1045,9 +1071,20 @@ if (!window.__sspTurnstileReady) {
                 var restBase = (settings.rest_base && typeof settings.rest_base === 'string') ? settings.rest_base : '';
                 if (restBase && restBase.slice(-1) !== '/') { restBase += '/'; }
                 var targetUrl = settings.form_webhook;
+                var queueTransport = settings.form_delivery_transport === 'studio_queue';
 				if (settings.form_connection_id) {
 					data.set('_ssp_connection_id', String(settings.form_connection_id));
 				}
+
+                if (queueTransport) {
+                    if (!settings.form_queue_site_id || !settings.form_connection_id) {
+                        handleMessage(settings, true, form);
+                        return { success: false, settings: settings, form: form, error: 'queue_configuration_missing' };
+                    }
+                    form.__sspQueueSubmissionId = form.__sspQueueSubmissionId || sspSubmissionId();
+                    data.set('_ssp_submission_id', form.__sspQueueSubmissionId);
+                    data.set('_ssp_site_id', String(settings.form_queue_site_id));
+                }
 
                 if (settings.form_id && isSimplyStaticEntriesEndpoint(targetUrl)) {
                     data.set('_ssp_form_id', String(settings.form_id));
@@ -1067,6 +1104,34 @@ if (!window.__sspTurnstileReady) {
 					console.error('[SSP] CAPTCHA proxy required but its form widget is unavailable.');
 					return { success: false, settings: settings, form: form, error: 'captcha_widget_missing' };
 				}
+
+                if (queueTransport) {
+                    if (hasTurnstile) {
+                        if (!data.has('cf-turnstile-response')) {
+                            var queueTsContainer = form.querySelector('.ssp-cf-turnstile') || (form.closest('.nf-form-cont') && form.closest('.nf-form-cont').querySelector('.ssp-cf-turnstile'));
+                            var queueTsInput = form.querySelector('input[name="cf-turnstile-response"]') || (form.closest('.nf-form-cont') && form.closest('.nf-form-cont').querySelector('input[name="cf-turnstile-response"]'));
+                            if (!queueTsInput && queueTsContainer) { queueTsInput = queueTsContainer.querySelector('input[name="cf-turnstile-response"]'); }
+                            if (queueTsInput && queueTsInput.value) { data.set('cf-turnstile-response', queueTsInput.value); }
+                        }
+                        return submitForm(targetUrl, settings, data, form);
+                    }
+
+                    if (hasRecaptcha && typeof grecaptcha !== 'undefined') {
+                        return new Promise(function (resolve) {
+                            grecaptcha.ready(function () {
+                                grecaptcha.execute(recaptchaInput.getAttribute('data-sitekey'), { action: 'submit' }).then(function (token) {
+                                    data.set('g-recaptcha-response', token);
+                                    resolve(submitForm(targetUrl, settings, data, form));
+                                }).catch(function () {
+                                    handleMessage(settings, true, form);
+                                    resolve({ success: false, settings: settings, form: form, error: 'recaptcha_failed' });
+                                });
+                            });
+                        });
+                    }
+
+                    return submitForm(targetUrl, settings, data, form);
+                }
 
                 if (hasTurnstile && restBase && targetUrl) {
                     if (!data.has('cf-turnstile-response')) {
