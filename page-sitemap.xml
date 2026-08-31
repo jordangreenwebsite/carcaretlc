@@ -1,91 +1,91 @@
-<?xml version="1.0" encoding="UTF-8"?><?xml-stylesheet type="text/xsl" href="/main-sitemap.xsl"?>
+<?xml version="1.0" encoding="UTF-8"?><?xml-stylesheet type="text/xsl" href="https://carcaretlc.com/main-sitemap.xsl"?>
 <urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd http://www.google.com/schemas/sitemap-image/1.1 http://www.google.com/schemas/sitemap-image/1.1/sitemap-image.xsd" xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 	<url>
-		<loc>/</loc>
+		<loc>https://carcaretlc.com/</loc>
 		<lastmod>2026-07-28T09:24:33+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/driving-lessons/gift-vouchers/</loc>
+		<loc>https://carcaretlc.com/driving-lessons/</loc>
+		<lastmod>2026-07-30T11:13:48+00:00</lastmod>
+	</url>
+	<url>
+		<loc>https://carcaretlc.com/driving-lessons/gift-vouchers/</loc>
 		<lastmod>2026-07-28T09:23:56+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/driving-lessons/driving-lesson-prices/</loc>
+		<loc>https://carcaretlc.com/driving-lessons/driving-lesson-prices/</loc>
 		<lastmod>2026-07-28T09:23:39+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/driving-lessons/motorway-tuition/</loc>
+		<loc>https://carcaretlc.com/driving-lessons/motorway-tuition/</loc>
 		<lastmod>2026-07-28T09:23:28+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/driving-lessons/mock-driving-tests/</loc>
+		<loc>https://carcaretlc.com/driving-lessons/mock-driving-tests/</loc>
 		<lastmod>2026-07-28T09:23:20+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/driving-lessons/refresher-driving-lessons/</loc>
+		<loc>https://carcaretlc.com/driving-lessons/refresher-driving-lessons/</loc>
 		<lastmod>2026-07-28T09:23:08+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/driving-lessons/beginner-driving-lessons/</loc>
+		<loc>https://carcaretlc.com/driving-lessons/beginner-driving-lessons/</loc>
 		<lastmod>2026-07-28T09:22:59+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/driving-lessons/automatic-driving-lessons/</loc>
+		<loc>https://carcaretlc.com/driving-lessons/automatic-driving-lessons/</loc>
 		<lastmod>2026-07-28T09:22:49+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/driving-lessons/</loc>
-		<lastmod>2026-07-28T09:22:39+00:00</lastmod>
-	</url>
-	<url>
-		<loc>/contact-us/</loc>
+		<loc>https://carcaretlc.com/contact-us/</loc>
 		<lastmod>2026-07-28T09:22:29+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/car-care/small-mechanical-repairs/</loc>
+		<loc>https://carcaretlc.com/car-care/small-mechanical-repairs/</loc>
 		<lastmod>2026-07-28T09:22:15+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/car-care/vehicle-diagnostics/</loc>
+		<loc>https://carcaretlc.com/car-care/vehicle-diagnostics/</loc>
 		<lastmod>2026-07-28T09:22:05+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/car-care/brakes-suspension/</loc>
+		<loc>https://carcaretlc.com/car-care/brakes-suspension/</loc>
 		<lastmod>2026-07-28T09:21:53+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/car-care/oil-changes/</loc>
+		<loc>https://carcaretlc.com/car-care/oil-changes/</loc>
 		<lastmod>2026-07-28T09:21:43+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/car-care/vehicle-servicing/</loc>
+		<loc>https://carcaretlc.com/car-care/vehicle-servicing/</loc>
 		<lastmod>2026-07-28T09:21:30+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/car-care/correction-protection/</loc>
+		<loc>https://carcaretlc.com/car-care/correction-protection/</loc>
 		<lastmod>2026-07-28T09:21:17+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/car-care/car-detailing/</loc>
+		<loc>https://carcaretlc.com/car-care/car-detailing/</loc>
 		<lastmod>2026-07-28T09:21:03+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/car-care/</loc>
+		<loc>https://carcaretlc.com/car-care/</loc>
 		<lastmod>2026-07-28T09:20:48+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/areas-covered/</loc>
+		<loc>https://carcaretlc.com/areas-covered/</loc>
 		<lastmod>2026-07-28T09:20:35+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/privacy-policy/</loc>
+		<loc>https://carcaretlc.com/privacy-policy/</loc>
 		<lastmod>2026-07-28T07:42:03+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/booking-terms/</loc>
+		<loc>https://carcaretlc.com/booking-terms/</loc>
 		<lastmod>2026-07-28T06:55:13+00:00</lastmod>
 	</url>
 	<url>
-		<loc>/about/</loc>
+		<loc>https://carcaretlc.com/about/</loc>
 		<lastmod>2026-07-28T06:48:15+00:00</lastmod>
 	</url>
 </urlset>
