@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://carcaretlc.co.uk/sitemap_index.xml
